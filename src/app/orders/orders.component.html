@@ -1,0 +1,50 @@
+<div class="center">
+
+  <ng-container *ngIf="settings">
+    <h1 class="timer" *ngIf="!settings.disable; else disabled">
+      T - {{thurgerTime$ | async}}
+    </h1>
+    <ng-template #disabled>
+      <h1>
+        Order time over yo
+      </h1>
+    </ng-template>
+  </ng-container>
+
+  <div *ngIf="counts$ | async as count">
+    <h2>Normal Orders</h2>
+    Beef: {{count.Beef}} - Chicken: {{count.Chicken}}
+
+    <h2>Special Orders</h2>
+    <div *ngFor="let extra of count.Other">
+      {{extra}}
+    </div>
+  </div>
+
+  <div>
+    <h2>What do you want?</h2>
+  </div>
+  <ng-container *ngIf="user$ | async as user">
+    <button mat-raised-button color="primary" (click)="add(user.uid, user.email)">Add Order</button>
+    <div *ngFor="let order of thurgers$ | async as thurger; trackBy: trackById">
+      <span class="side">{{ cutOffRl(order.email) }}</span>
+      <span class="fixed">
+
+        <button mat-raised-button [color]="order.choice === 'Beef' ? 'primary' : ''"
+        (click)="update(order.id, 'Beef', extras.value, canEdit(order.userId, user.uid))" >Beef</button>
+
+        <button mat-raised-button [color]="order.choice === 'Chicken' ? 'primary' : ''"
+        (click)="update(order.id, 'Chicken', extras.value, canEdit(order.userId, user.uid))" >Chicken</button>
+
+        <button mat-raised-button color="warn" (click)="remove(order.id)" [disabled]="!canEdit(order.userId, user.uid)" >Remove</button>
+        <mat-form-field>
+
+          <input matInput [disabled]="!canEdit(order.userId, user.uid)" placeholder="Extras" #extras [value]="order.extras"
+          (keyup)="update(order.id, order.choice, extras.value, canEdit(order.userId, user.uid))"/>
+
+        </mat-form-field>
+      </span>
+      <span class="side">{{order.addedAt}} ago</span>
+    </div>
+  </ng-container>
+</div>
