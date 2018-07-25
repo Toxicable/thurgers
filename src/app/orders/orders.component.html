@@ -11,40 +11,49 @@
     </ng-template>
   </ng-container>
 
-  <div *ngIf="counts$ | async as count">
-    <h2>Normal Orders</h2>
-    Beef: {{count.Beef}} - Chicken: {{count.Chicken}}
+  <div *ngIf="orderGroups$ | async as groups">
 
-    <h2>Special Orders</h2>
-    <div *ngFor="let extra of count.Other">
-      {{extra}}
+    <div *ngFor="let group of getGroups(groups)">
+      <div *ngIf="group !== 'special'">
+        {{group}} - {{groups[group].length}}
+      </div>
+      <div *ngIf="group === 'special'">
+        <div *ngFor="let order of groups[group]">
+          {{order.itemName}} - {{order.extras}}
+        </div>
+      </div>
     </div>
+
   </div>
 
   <div>
     <h2>What do you want?</h2>
   </div>
-  <ng-container *ngIf="user$ | async as user">
-    <button mat-raised-button color="primary" (click)="add(user.uid, user.email)">Add Order</button>
-    <div *ngFor="let order of thurgers$ | async as thurger; trackBy: trackById">
-      <span class="side">{{ cutOffRl(order.email) }}</span>
-      <span class="fixed">
+  <ng-container *ngIf="order$ | async as order">
+    <span class="fixed">
 
-        <button mat-raised-button [color]="order.choice === 'Beef' ? 'primary' : ''"
-        (click)="update(order.id, 'Beef', extras.value, canEdit(order.userId, user.uid))" >Beef</button>
+      <ng-container *ngFor="let item of menu"> 
+        <button mat-raised-button [color]="order.itemName === item.name ? 'primary': ''" (click)="updateOrder(item)" >{{item.name}}</button>
+      </ng-container>
 
-        <button mat-raised-button [color]="order.choice === 'Chicken' ? 'primary' : ''"
-        (click)="update(order.id, 'Chicken', extras.value, canEdit(order.userId, user.uid))" >Chicken</button>
+      <button mat-raised-button color="warn" (click)="updateOrder(null)" >Remove</button>
+      
+      <mat-form-field>
+        <input matInput [value]="order.extras || ''" placeholder="Extras" (keyup)="updateExtras($event.target.value)" />
+      </mat-form-field>
 
-        <button mat-raised-button color="warn" (click)="remove(order.id)" [disabled]="!canEdit(order.userId, user.uid)" >Remove</button>
-        <mat-form-field>
-
-          <input matInput [disabled]="!canEdit(order.userId, user.uid)" placeholder="Extras" #extras [value]="order.extras"
-          (keyup)="update(order.id, order.choice, extras.value, canEdit(order.userId, user.uid))"/>
-
-        </mat-form-field>
-      </span>
-      <span class="side">{{order.addedAt}} ago</span>
-    </div>
+    </span>
   </ng-container>
+  
+  <div>
+    <h2>Orders</h2>
+  </div>
+
+  <div class="flex">
+    <ng-container *ngFor="let order of orders$ | async as orders; trackBy: trackById">
+      <span class="side">{{ cutOffRl(order.email) }}</span>
+      <span>{{order.itemName}} <span *ngIf="order.extras">- {{order.extras}}</span></span>
+      <span class="side">{{order.updatedAt}} ago</span>
+    </ng-container>
+  </div>
 </div>

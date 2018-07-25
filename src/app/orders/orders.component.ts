@@ -1,34 +1,38 @@
 import { Component, OnInit } from '@angular/core';
 import { first, map, shareReplay, take, concatMap, tap } from 'rxjs/operators';
-import { combineLatest } from 'rxjs/observable/combineLatest';
 import { AngularFirestore, AngularFirestoreCollection, DocumentChangeAction, AngularFirestoreDocument } from 'angularfire2/firestore';
-import { Observable } from 'rxjs/Observable';
-import { Thurger } from './thuger';
-import { timer } from 'rxjs/observable/timer';
 import { addDays, distanceInWordsToNow } from 'date-fns';
 import { AngularFireAuth } from 'angularfire2/auth';
 import { User } from '@firebase/auth-types';
-import { of } from 'rxjs/observable/of';
+import { FormControl } from '@angular/forms';
+import { Subject, from, Observable, timer, combineLatest } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 
 export interface Settings {
   disable: boolean;
 }
 
-function snapshotChangesId<T>(items: DocumentChangeAction[]): any  {
-  return items.map(a => {
-    const data = a.payload.doc.data();
-    const id = a.payload.doc.id;
-    return { id, ...data };
-  });
+interface MenuItem {
+  name: string;
+}
+
+interface Order {
+  uid: string;
+  itemName: string;
+  email: string;
+  updatedAt: string;
+  extras: string;
 }
 
 @Component({
   selector: 'app-orders',
   templateUrl: 'orders.component.html',
   styles: [`
-    .side {
-      display: inline-block;
-      width: 250px;
+    .flex {
+      text-align: center;
+      justify-content: center;
+      display: grid;
+      grid-template-columns: 300px 300px 300px;
     }
   `]
 })
@@ -40,62 +44,89 @@ export class OrdersComponent implements OnInit {
   ) { }
 
   settingsRef: AngularFirestoreDocument<Settings>;
-  thurgersRef: AngularFirestoreCollection<Thurger>;
+  ordersRef: AngularFirestoreCollection<Order>;
+  order$: Observable<Order>;
+  orders$: Observable<Order[]>;
+  orderRef$: Observable<AngularFirestoreDocument<Order>>;
+  orderGroups$: Observable<{[key: string]: Order[]}>
 
   timer$: Observable<Date>;
-  user$: Observable<User>;
+  user$: Observable<firebase.User>;
 
-  thurgers$: Observable<Thurger[]>;
   thurgerTime$: Observable<string>;
-  counts$: Observable<{ Chicken: number; Beef: number }>;
-  thurgerIds$: Observable<Thurger[]>;
   settings: Settings;
+
+  selectedItem = new Subject();
+
+  menu: MenuItem[] = [
+    {name: 'Beef 🍔'},
+    {name: 'Chicken 🍔'},
+    {name: 'Veggie 🍔'},
+  ]
+  veggieControl = new FormControl(false);
 
   cutOffRl(email: string) {
     return email.replace(atob('QHJvY2tldGxhYi5jby5ueg=='), '');
   }
 
   ngOnInit() {
-    this.thurgersRef = this.afs.collection<Thurger>('thurgers', ref => ref.orderBy('addedAt', 'desc'));
+    this.ordersRef = this.afs.collection<Order>('orders', ref => ref.orderBy('updatedAt', 'desc'));
     this.settingsRef = this.afs.doc('settings/1');
     this.settingsRef.valueChanges().subscribe(s => this.settings = s);
-
-    window['disableItYo'] = () => this.settingsRef.update({disable: true});
-
-    this.user$ = this.afAuth.authState;
+    this.user$ = this.afAuth.authState.pipe(shareReplay());
     this.timer$ = timer(0, 1000).pipe(map(i => new Date()), shareReplay());
 
-    this.thurgerIds$ = this.thurgersRef.snapshotChanges()
-      .map(thurgers => snapshotChangesId<Thurger>(thurgers))
-      .map((thurgers: Thurger[]) => {
-        return thurgers.map(t => {
-          t.addedAt = distanceInWordsToNow(t.updatedAt);
-          return t;
-        });
+    this.orderRef$ =  this.user$.pipe(map(user => this.ordersRef.doc<Order>(user.uid)));
+
+    this.order$ = this.user$.pipe(
+      switchMap(user => {
+        return this.orderRef$.pipe(switchMap(ref =>
+          from(ref.set({
+            uid: user.uid, 
+            email: user.email,
+            updatedAt: new Date().toISOString()
+          } as any, {merge: true}))
+          .pipe(
+            concatMap(() => ref.valueChanges()),
+          )))
       })
-      .pipe(shareReplay());
+    );
 
-
-    this.counts$ = this.thurgerIds$
-      .map(thurgers => {
-        const count = {
-          Chicken: 0,
-          Beef: 0,
-          Other: []
-        };
-        thurgers.forEach(t => {
-          if (t.extras) {
-            count.Other.push(`${t.choice} + ${t.extras}`);
-          } else {
-            count[t.choice] += 1;
+    this.orders$ = combineLatest(
+      this.timer$, 
+      this.ordersRef.valueChanges()
+    ).pipe(map(([timer, orders]) => {
+      return orders.filter(order => Boolean(order.itemName))
+        .map(t => {
+          return {
+            ...t,
+            updatedAt: distanceInWordsToNow(t.updatedAt)
           }
         });
-        count.Other.sort();
-        return count;
+    }))
+      
+    window['disableItYo'] = () => this.settingsRef.update({disable: true});
+    
+    this.orderGroups$ = this.orders$.pipe(map(orders => {
+      const grouped: {[key: string]: Order[]} = {
+        special: []
+      };
+
+      orders.forEach(order => {
+        if(order.extras) {
+          grouped['special'].push(order)
+        } else if(grouped[order.itemName]){
+          grouped[order.itemName].push(order)
+        }else {
+          grouped[order.itemName] = [order];
+        }
       });
 
-    this.thurgers$ = combineLatest(this.timer$, this.thurgerIds$, (time, thurgers) => thurgers).pipe(tap(a => console.log));
+      grouped['special'] = grouped['special'].sort();
 
+      return grouped;
+    }));
+        
     const thursday = 4;
 
     this.thurgerTime$ = this.timer$.pipe(
@@ -120,8 +151,30 @@ export class OrdersComponent implements OnInit {
     );
   }
 
-  canEdit(orderId: string, uid: string) {
-    return orderId === uid;
+  getGroups(groups: {}) {
+    return Object.keys(groups).sort();
+  }
+
+  updateOrder(item: MenuItem | null) {
+    this.orderRef$.pipe(
+      concatMap(ref => ref.update({
+        itemName: item ? item.name : '',
+        updatedAt: new Date().toISOString(),
+      }))
+    ).subscribe();
+  }
+
+  updateExtras(extras = '') {
+    this.orderRef$.pipe(
+      concatMap(ref => ref.update({
+        updatedAt: new Date().toISOString(),
+        extras
+      }))
+    ).subscribe();
+  }
+
+  trackById(idx: number, item: Order) {
+    return item.uid;
   }
 
   getTimeRemaining(endtime: Date) {
@@ -136,46 +189,5 @@ export class OrdersComponent implements OnInit {
       'minutes': minutes,
       'seconds': seconds
     };
-  }
-
-  trackById(idx: number, item: any) {
-    return item['id'];
-  }
-
-  update(id: string, choice: 'Chicken' | 'Beef', extras: string, canEdit: boolean) {
-    if (!canEdit || this.settings.disable) {
-      return;
-    }
-    this.thurgersRef.doc(id).update({
-      choice,
-      extras,
-      updatedAt: new Date().toISOString(),
-    });
-  }
-
-  add(userId: string, email: string) {
-    if (this.settings.disable) {
-      return;
-    }
-    this.afs.collection<Thurger>('thurgers').valueChanges().pipe(take(1), tap(thurgers => {
-      const existing = thurgers.find(t => t.email === email);
-      if (!existing) {
-        this.thurgersRef.add({
-          email,
-          userId,
-          choice: null,
-          extras: null,
-          addedAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-      }
-    })).subscribe();
-  }
-
-  remove(id: string) {
-    if (this.settings.disable) {
-      return;
-    }
-    return this.thurgersRef.doc(id).delete();
   }
 }
