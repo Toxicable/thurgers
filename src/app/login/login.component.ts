@@ -1,10 +1,10 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { FormControl, Validators, FormGroup, AbstractControl } from '@angular/forms';
-import { AngularFireAuth, AngularFireAuthModule} from 'angularfire2/auth';
-import { AngularFirestore, AngularFirestoreCollection } from 'angularfire2/firestore';
+import { AngularFireAuth, AngularFireAuthModule} from '@angular/fire/auth';
+import { AngularFirestore, AngularFirestoreCollection } from '@angular/fire/firestore';
 import { User } from './user';
 import { Router } from '@angular/router';
-import * as firebase from 'firebase/app';
+import firebase from 'firebase/app';
 
 @Component({
 
@@ -30,16 +30,9 @@ export class LoginComponent {
 
   login() {
     this.error = false;
-    this.afAuth.auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
+    this.afAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
     .then(state => {
-      const email = atob('QHJvY2tldGxhYi5jby5ueg==');
-      if ((state.user.email as string).endsWith(email)) {
         this.router.navigateByUrl('/');
-      } else {
-        this.error = true;
-        this.afAuth.auth.signOut();
-        this.cdr.detectChanges();
-      }
     });
   }
 }

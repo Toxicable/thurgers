@@ -1,18 +1,20 @@
-import { BrowserModule } from '@angular/platform-browser';
 import { NgModule } from '@angular/core';
-import { ReactiveFormsModule } from '@angular/forms';
+import { BrowserModule } from '@angular/platform-browser';
 
 import { AppComponent } from './app.component';
-
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { MatButtonModule, MatSelectModule, MatInputModule, MatCheckboxModule } from '@angular/material';
-import { AngularFirestoreModule } from 'angularfire2/firestore';
-import { AngularFireAuthModule } from 'angularfire2/auth';
-import { AngularFireModule } from 'angularfire2';
-import { LoginComponent } from './login/login.component';
-import { OrdersComponent } from './orders/orders.component';
+import { AngularFireModule } from '@angular/fire';
 import { RouterModule } from '@angular/router';
 import { AuthGuardService } from './login/auth.guard';
+import { LoginComponent } from './login/login.component';
+import { OrdersComponent } from './orders/orders.component';
+import { ReactiveFormsModule } from '@angular/forms';
+import {AngularFireAuthModule} from '@angular/fire/auth';
+import {AngularFirestoreModule} from '@angular/fire/firestore';
+import {MatCheckboxModule} from '@angular/material/checkbox';
+import {MatInputModule} from '@angular/material/input';
+import {MatSelectModule} from '@angular/material/select';
+import {MatButtonModule} from '@angular/material/button';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 
 @NgModule({
   declarations: [
@@ -30,6 +32,10 @@ import { AuthGuardService } from './login/auth.guard';
     ReactiveFormsModule,
     AngularFirestoreModule,
     AngularFireAuthModule,
+    RouterModule.forRoot([
+      {path: '', component: OrdersComponent, canActivate: [AuthGuardService]},
+      {path: 'login', component: LoginComponent},
+    ]),
     AngularFireModule.initializeApp({
       apiKey: 'AIzaSyCz1r2UaADi_Xel0-QOpMyLy0gvFWjCbQg',
       authDomain: 'thurgers.firebaseapp.com',
@@ -38,12 +44,9 @@ import { AuthGuardService } from './login/auth.guard';
       storageBucket: 'thurgers.appspot.com',
       messagingSenderId: '1016886607087'
     }),
-    RouterModule.forRoot([
-      {path: '', component: OrdersComponent, canActivate: [AuthGuardService]},
-      {path: 'login', component: LoginComponent},
-    ])
   ],
   providers: [AuthGuardService],
   bootstrap: [AppComponent]
 })
 export class AppModule { }
+

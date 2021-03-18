@@ -1,12 +1,12 @@
 import { Component, OnInit } from '@angular/core';
 import { first, map, shareReplay, take, concatMap, tap } from 'rxjs/operators';
-import { AngularFirestore, AngularFirestoreCollection, DocumentChangeAction, AngularFirestoreDocument } from 'angularfire2/firestore';
-import { addDays, distanceInWordsToNow } from 'date-fns';
-import { AngularFireAuth } from 'angularfire2/auth';
-import { User } from '@firebase/auth-types';
+import { AngularFirestore, AngularFirestoreCollection, DocumentChangeAction, AngularFirestoreDocument } from '@angular/fire/firestore';
+import { AngularFireAuth} from '@angular/fire/auth';
+import { addDays, formatDistanceToNow } from 'date-fns';
 import { FormControl } from '@angular/forms';
 import { Subject, from, Observable, timer, combineLatest } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
+import firebase from 'firebase/app';
 
 export interface Settings {
   disable: boolean;
@@ -82,7 +82,7 @@ export class OrdersComponent implements OnInit {
       switchMap(user => {
         return this.orderRef$.pipe(switchMap(ref =>
           from(ref.set({
-            uid: user.uid, 
+            uid: user.uid,
             email: user.email,
             updatedAt: new Date().toISOString()
           } as any, {merge: true}))
@@ -93,20 +93,20 @@ export class OrdersComponent implements OnInit {
     );
 
     this.orders$ = combineLatest(
-      this.timer$, 
+      this.timer$,
       this.ordersRef.valueChanges()
     ).pipe(map(([timer, orders]) => {
       return orders.filter(order => Boolean(order.itemName))
         .map(t => {
           return {
             ...t,
-            updatedAt: distanceInWordsToNow(t.updatedAt)
+            updatedAt: formatDistanceToNow(new Date(t.updatedAt))
           }
         });
     }))
-      
+
     window['disableItYo'] = () => this.settingsRef.update({disable: true});
-    
+
     this.orderGroups$ = this.orders$.pipe(map(orders => {
       const grouped: {[key: string]: Order[]} = {
         special: []
@@ -126,7 +126,7 @@ export class OrdersComponent implements OnInit {
 
       return grouped;
     }));
-        
+
     const thursday = 4;
 
     this.thurgerTime$ = this.timer$.pipe(
